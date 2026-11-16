@@ -299,6 +299,7 @@ func (e *Engine) registerHandlers() {
 		"messages.list":   e.handleMessagesList,
 		"messages.send":   e.handleMessagesSend,
 		"chats.markRead":  e.handleChatsMarkRead,
+		"media.preview":   e.handleMediaPreview,
 		"search":          e.handleSearch,
 	}
 	for method, handler := range h {

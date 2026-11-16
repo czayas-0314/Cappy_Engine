@@ -380,6 +380,13 @@ func TestEndToEndWithFakeNetwork(t *testing.T) {
 	if read.Unread != 0 {
 		t.Fatalf("unread after markRead without through = %d", read.Unread)
 	}
+	// media.preview refuses a text message and a message from another chat.
+	if _, err := c.call("media.preview", map[string]any{"chat": chatID, "message": firstMsgID}); err == nil || err.Code != CodeMediaUnavailable {
+		t.Fatalf("expected media_unavailable for a text message, got %+v", err)
+	}
+	if _, err := c.call("media.preview", map[string]any{"chat": chatID, "message": "msg_nope"}); err == nil {
+		t.Fatal("expected an error for an unknown message")
+	}
 	for _, bad := range []map[string]any{{"chat": chatID, "through": "msg_nope"}, {"chat": "chat_nope"}} {
 		if _, err := c.call("chats.markRead", bad); err == nil {
 			t.Fatalf("expected an error for %v", bad)

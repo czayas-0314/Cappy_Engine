@@ -13,6 +13,7 @@ It links the following components. Their license texts are in
 | mautrix-go (maunium.net/go/mautrix) v0.32.0 | MPL-2.0 | `mautrix-go.LICENSE.txt` |
 | whatsmeow (go.mau.fi/whatsmeow) | MPL-2.0 | `whatsmeow.LICENSE.txt` |
 | go.mau.fi/util v0.11.0 | MPL-2.0 | `mau-util.LICENSE.txt` |
+| The Go standard library and golang.org/x modules (crypto, exp, image, net, sync, sys, text), all from The Go Authors | BSD-3-Clause | `go.LICENSE.txt` |
 | mattn/go-sqlite3 v1.14.52, which bundles SQLite (public domain) | MIT | `go-sqlite3.LICENSE.txt` |
 | bottled-bridge-core (cloud-in-a-bottle, commit `e801a224`). Code adapted from it in `internal/localmx/*.go` and `internal/fakenet/fakenet.go` says so in each file header. | AGPL-3.0 | `bottled-bridge-core.LICENSE.txt` |
 
