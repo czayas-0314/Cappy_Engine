@@ -352,6 +352,40 @@ func TestEndToEndWithFakeNetwork(t *testing.T) {
 		t.Fatalf("unexpected search results: %+v", found)
 	}
 
+	// chats.markRead clears the unread count, announces the chat and hands a read receipt to the network.
+	var before struct {
+		Chats []inbox.Chat `json:"chats"`
+	}
+	c.mustCall("chats.list", map[string]any{}, &before)
+	if len(before.Chats) == 0 || before.Chats[0].Unread != 1 {
+		t.Fatalf("expected one unread message before markRead: %+v", before.Chats)
+	}
+	var read struct {
+		Unread int `json:"unread"`
+	}
+	mark = c.noteCount()
+	c.mustCall("chats.markRead", map[string]any{"chat": chatID, "through": firstMsgID}, &read)
+	if read.Unread != 0 {
+		t.Fatalf("unread after markRead = %d", read.Unread)
+	}
+	c.waitNote(mark, "chat.updated", func(p json.RawMessage) bool { return strings.Contains(string(p), `"unread":0`) })
+	deadline := time.Now().Add(3 * time.Second)
+	for len(te.net.Receipts()) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if got := te.net.Receipts(); len(got) != 1 || got[0].ExactMessage == nil || got[0].ExactMessage.ID != "a1" {
+		t.Fatalf("expected one read receipt for a1, got %+v", got)
+	}
+	c.mustCall("chats.markRead", map[string]any{"chat": chatID, "through": nil}, &read)
+	if read.Unread != 0 {
+		t.Fatalf("unread after markRead without through = %d", read.Unread)
+	}
+	for _, bad := range []map[string]any{{"chat": chatID, "through": "msg_nope"}, {"chat": "chat_nope"}} {
+		if _, err := c.call("chats.markRead", bad); err == nil {
+			t.Fatalf("expected an error for %v", bad)
+		}
+	}
+
 	// The same remote message again (eg after a reconnect) is not stored or announced twice.
 	mark = c.noteCount()
 	te.queue(t, fakenet.TextMessage(fakenet.DMKey(), "alice", "a1", "CAPPY-CANARY-1 synthetic hello", base))

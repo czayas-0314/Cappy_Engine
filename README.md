@@ -227,8 +227,8 @@ go build -tags sqlite_fts5 -trimpath -o dist/cappy-t8 ./cmd/cappy-t8
   §13 is implemented:
   - Requests: `hello`, `networks.list`, `login.start`, `login.submit`,
     `login.cancel`, `accounts.list`, `accounts.logout`, `chats.list`,
-    `messages.list`, `messages.send`, `search`, `ping`, `engine.stats` and
-    `shutdown`.
+    `chats.markRead`, `messages.list`, `messages.send`, `search`, `ping`,
+    `engine.stats` and `shutdown`.
   - Notifications: `login.step`, `account.state`, `chat.updated` (debounced
     250 ms per chat), `message.new`, `message.updated` and `engine.resync`.
   - Login sessions have their own context, a waiter that pushes rotated QR

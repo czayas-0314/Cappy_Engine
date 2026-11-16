@@ -412,3 +412,76 @@ func (e *Engine) handleMessagesSend(ctx context.Context, params json.RawMessage)
 	}()
 	return map[string]any{"message": msg}, nil
 }
+
+type markReadParams struct {
+	Chat    string  `json:"chat"`
+	Through *string `json:"through"`
+}
+
+// handleChatsMarkRead marks a chat read up to a message (or its newest message), clears the local
+// unread count and hands a read receipt to the network, which sends it like the official app does.
+func (e *Engine) handleChatsMarkRead(ctx context.Context, params json.RawMessage) (any, error) {
+	var p markReadParams
+	if err := rpc.Decode(params, &p); err != nil {
+		return nil, err
+	}
+	row, rerr := e.chatRoom(ctx, p.Chat)
+	if rerr != nil {
+		return nil, rerr
+	}
+	var target *inbox.Message
+	if p.Through != nil {
+		eventID := inbox.EventFromMessageID(*p.Through)
+		msg, err := e.inbox.Message(ctx, eventID)
+		if eventID == "" || err != nil || msg.RoomID != row.RoomID {
+			return nil, rpc.InvalidParams("through is not a message in this chat")
+		}
+		target = msg
+	} else {
+		newest, _, err := e.inbox.ListMessages(ctx, row.RoomID, "", 1)
+		if err != nil {
+			return nil, err
+		}
+		if len(newest) > 0 {
+			target = newest[len(newest)-1]
+		}
+	}
+	if target != nil {
+		ch, err := e.inbox.Tx(ctx, func(tx *inbox.Tx) error { return tx.SetLastRead(row.RoomID, target.Ts) })
+		if err != nil {
+			return nil, err
+		}
+		e.notifier.Changed(ctx, ch)
+		e.sendReadReceipt(row, target)
+	}
+	summary, err := e.inbox.ChatSummary(ctx, row.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"unread": summary.Unread}, nil
+}
+
+// sendReadReceipt queues the receipt for the chat's network in the background. The local read state
+// is already saved, so a network that is offline or not logged in only misses the receipt.
+func (e *Engine) sendReadReceipt(row *inbox.ChatRow, target *inbox.Message) {
+	n := e.networkMap[row.Network]
+	if n == nil || n.usable() != nil || target.FromMe || !e.beginSend() {
+		return
+	}
+	evt := &event.Event{
+		Type:    event.EphemeralEventReceipt,
+		Sender:  localmx.OwnerMXID,
+		RoomID:  id.RoomID(row.RoomID),
+		Mautrix: event.MautrixInfo{EventSource: event.SourceEphemeral},
+		Content: event.Content{Parsed: &event.ReceiptEventContent{
+			id.EventID(target.EventID): {event.ReceiptTypeRead: {localmx.OwnerMXID: {Timestamp: time.Now()}}},
+		}},
+	}
+	go func() {
+		defer e.sendWG.Done()
+		ctx := e.log.With().Str("network", row.Network).Logger().WithContext(e.bgCtx)
+		if res := n.br.QueueMatrixEvent(ctx, evt); res.Error != nil {
+			e.log.Warn().Str("network", row.Network).Msg("A read receipt could not be queued")
+		}
+	}()
+}

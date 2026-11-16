@@ -33,6 +33,7 @@ type Network struct {
 	mu       sync.Mutex
 	sent     []*bridgev2.MatrixMessage
 	failSend bool
+	receipts []*bridgev2.MatrixReadReceipt
 	history  map[networkid.PortalID][]*bridgev2.BackfillMessage
 }
 
@@ -58,6 +59,13 @@ func (n *Network) Sent() []*bridgev2.MatrixMessage {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return append([]*bridgev2.MatrixMessage(nil), n.sent...)
+}
+
+// Receipts are the read receipts the bridge handed to the network.
+func (n *Network) Receipts() []*bridgev2.MatrixReadReceipt {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return append([]*bridgev2.MatrixReadReceipt(nil), n.receipts...)
 }
 
 var _ bridgev2.NetworkConnector = (*Network)(nil)
@@ -144,9 +152,17 @@ type client struct {
 }
 
 var (
-	_ bridgev2.NetworkAPI            = (*client)(nil)
-	_ bridgev2.BackfillingNetworkAPI = (*client)(nil)
+	_ bridgev2.NetworkAPI                    = (*client)(nil)
+	_ bridgev2.BackfillingNetworkAPI         = (*client)(nil)
+	_ bridgev2.ReadReceiptHandlingNetworkAPI = (*client)(nil)
 )
+
+func (c *client) HandleMatrixReadReceipt(_ context.Context, receipt *bridgev2.MatrixReadReceipt) error {
+	c.n.mu.Lock()
+	defer c.n.mu.Unlock()
+	c.n.receipts = append(c.n.receipts, receipt)
+	return nil
+}
 
 func (c *client) Connect(ctx context.Context) {
 	c.login.BridgeState.Send(statusConnected())
