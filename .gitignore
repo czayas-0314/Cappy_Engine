@@ -1,0 +1,15 @@
+# Go toolchain caches (local to this repo)
+.gopath/
+.gocache/
+# Upstream source checkouts used for reading/pinning (not vendored into git)
+upstream/
+# Build output
+bin/
+*.noindex/
+# Runtime data
+data/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+dist/
